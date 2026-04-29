@@ -1,0 +1,633 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BZN|BE Day-Ahead Prices — Elia</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #ffffff;
+    --bg2: #f5f4f1;
+    --bg3: #eeecea;
+    --text: #1a1a18;
+    --text2: #5f5e5a;
+    --text3: #888780;
+    --border: rgba(0,0,0,0.10);
+    --border2: rgba(0,0,0,0.18);
+    --accent: #185FA5;
+    --accent-light: #E6F1FB;
+    --neg: #993C1D;
+    --neg-light: #FAECE7;
+    --pos: #0F6E56;
+    --bar-pos: #378ADD;
+    --bar-neg: #D85A30;
+    --radius: 10px;
+    --radius-sm: 6px;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1c1a;
+      --bg2: #252522;
+      --bg3: #2e2e2b;
+      --text: #f0efe8;
+      --text2: #b4b2a9;
+      --text3: #888780;
+      --border: rgba(255,255,255,0.08);
+      --border2: rgba(255,255,255,0.15);
+      --accent: #85B7EB;
+      --accent-light: #042C53;
+      --neg: #F09595;
+      --neg-light: #501313;
+      --pos: #5DCAA5;
+      --bar-pos: #378ADD;
+      --bar-neg: #D85A30;
+    }
+  }
+
+  body {
+    font-family: -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    min-height: 100vh;
+    padding: 0;
+  }
+
+  .page {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 4rem;
+  }
+
+  .top-bar {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 2rem;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .title-block h1 {
+    font-size: 22px;
+    font-weight: 600;
+    letter-spacing: -0.3px;
+    color: var(--text);
+  }
+
+  .title-block p {
+    font-size: 13px;
+    color: var(--text3);
+    margin-top: 4px;
+  }
+
+  .refresh-btn {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--bg2);
+    border: 1px solid var(--border2);
+    border-radius: var(--radius-sm);
+    padding: 7px 14px;
+    font-size: 13px;
+    color: var(--text2);
+    cursor: pointer;
+    transition: background 0.15s;
+    white-space: nowrap;
+  }
+  .refresh-btn:hover { background: var(--bg3); }
+  .refresh-btn svg { width: 14px; height: 14px; flex-shrink: 0; }
+
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 2rem;
+    gap: 0;
+  }
+
+  .tab-btn {
+    padding: 9px 22px;
+    font-size: 13px;
+    font-weight: 500;
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text3);
+    cursor: pointer;
+    margin-bottom: -1px;
+    transition: color 0.15s, border-color 0.15s;
+  }
+  .tab-btn.active { color: var(--text); border-bottom-color: var(--accent); }
+  .tab-btn:disabled { opacity: 0.3; cursor: default; }
+
+  .badge {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    background: var(--accent-light);
+    color: var(--accent);
+    border-radius: 4px;
+    padding: 2px 6px;
+    margin-left: 6px;
+    vertical-align: middle;
+    letter-spacing: 0.3px;
+  }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 10px;
+    margin-bottom: 1.75rem;
+  }
+
+  @media (max-width: 600px) {
+    .stats-row { grid-template-columns: repeat(2, 1fr); }
+  }
+
+  .stat-card {
+    background: var(--bg2);
+    border-radius: var(--radius);
+    padding: 14px 16px;
+    border: 1px solid var(--border);
+  }
+  .stat-label {
+    font-size: 11px;
+    color: var(--text3);
+    margin-bottom: 6px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .stat-value {
+    font-size: 21px;
+    font-weight: 600;
+    color: var(--text);
+    line-height: 1;
+  }
+  .stat-unit {
+    font-size: 11px;
+    font-weight: 400;
+    color: var(--text3);
+    margin-left: 2px;
+  }
+
+  .chart-card {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: 1.25rem 1.25rem 0.75rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .chart-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .chart-header h2 {
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--text2);
+  }
+
+  .legend {
+    display: flex;
+    gap: 14px;
+    font-size: 11px;
+    color: var(--text3);
+    align-items: center;
+  }
+  .legend-dot {
+    width: 10px; height: 10px; border-radius: 2px; display: inline-block; margin-right: 4px;
+  }
+
+  .chart-wrap {
+    position: relative;
+    width: 100%;
+    height: 260px;
+  }
+
+  .table-card {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    overflow: hidden;
+  }
+
+  .table-scroll { overflow-x: auto; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  thead th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text3);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    padding: 10px 14px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+    white-space: nowrap;
+  }
+
+  tbody td {
+    padding: 8px 14px;
+    border-bottom: 1px solid var(--border);
+    color: var(--text);
+    vertical-align: middle;
+  }
+
+  tbody tr:last-child td { border-bottom: none; }
+  tbody tr:hover td { background: var(--bg2); }
+  tbody tr.current-row td { background: var(--accent-light) !important; }
+
+  .price-pos { color: var(--text); font-weight: 600; }
+  .price-neg { color: var(--neg); font-weight: 600; }
+  .price-high { color: var(--pos); font-weight: 600; }
+
+  .mini-bar-wrap { width: 90px; }
+  .mini-bar {
+    height: 6px;
+    border-radius: 3px;
+    min-width: 2px;
+    transition: width 0.3s;
+  }
+
+  .status-pill {
+    display: inline-block;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 20px;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+  }
+  .pill-now { background: var(--accent-light); color: var(--accent); }
+  .pill-past { background: var(--bg3); color: var(--text3); }
+  .pill-soon { background: var(--bg2); color: var(--text2); border: 1px solid var(--border2); }
+
+  .state-msg {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 3rem;
+    color: var(--text3);
+    font-size: 14px;
+    flex-direction: column;
+  }
+
+  .spinner {
+    width: 22px; height: 22px;
+    border: 2px solid var(--border2);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.7s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .last-updated {
+    font-size: 11px;
+    color: var(--text3);
+    margin-top: 1.5rem;
+    text-align: right;
+  }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="top-bar">
+    <div class="title-block">
+      <h1>Belgian day-ahead electricity prices</h1>
+      <p>BZN|BE &mdash; EPEX SPOT via Elia Open Data &mdash; per 15 minutes &middot; EUR/MWh</p>
+    </div>
+    <button class="refresh-btn" onclick="init()">
+      <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5">
+        <path d="M13.5 8a5.5 5.5 0 1 1-1.06-3.3" stroke-linecap="round"/>
+        <path d="M13.5 3v2.5H11" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+      Refresh
+    </button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab-btn active" id="tab0" onclick="switchTab(0)">Today</button>
+    <button class="tab-btn" id="tab1" onclick="switchTab(1)" disabled>Tomorrow</button>
+  </div>
+
+  <!-- TODAY -->
+  <div class="panel active" id="panel0">
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-label">Average</div><div class="stat-value" id="avg0">—</div></div>
+      <div class="stat-card"><div class="stat-label">Minimum</div><div class="stat-value" id="min0">—</div></div>
+      <div class="stat-card"><div class="stat-label">Maximum</div><div class="stat-value" id="max0">—</div></div>
+      <div class="stat-card"><div class="stat-label">Negative slots</div><div class="stat-value" id="neg0">—</div></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <h2>Price curve</h2>
+        <div class="legend">
+          <span><span class="legend-dot" style="background:#378ADD"></span>Positive</span>
+          <span><span class="legend-dot" style="background:#D85A30"></span>Negative</span>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="chart0" role="img" aria-label="Day-ahead electricity prices for today per quarter-hour"></canvas></div>
+    </div>
+    <div class="table-card" id="table0">
+      <div class="state-msg" id="state0"><div class="spinner"></div><span>Loading today's prices from Elia…</span></div>
+    </div>
+  </div>
+
+  <!-- TOMORROW -->
+  <div class="panel" id="panel1">
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-label">Average</div><div class="stat-value" id="avg1">—</div></div>
+      <div class="stat-card"><div class="stat-label">Minimum</div><div class="stat-value" id="min1">—</div></div>
+      <div class="stat-card"><div class="stat-label">Maximum</div><div class="stat-value" id="max1">—</div></div>
+      <div class="stat-card"><div class="stat-label">Negative slots</div><div class="stat-value" id="neg1">—</div></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-header">
+        <h2>Price curve</h2>
+        <div class="legend">
+          <span><span class="legend-dot" style="background:#378ADD"></span>Positive</span>
+          <span><span class="legend-dot" style="background:#D85A30"></span>Negative</span>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="chart1" role="img" aria-label="Day-ahead electricity prices for tomorrow per quarter-hour"></canvas></div>
+    </div>
+    <div class="table-card" id="table1">
+      <div class="state-msg" id="state1"><div class="spinner"></div><span>Loading tomorrow's prices from Elia…</span></div>
+    </div>
+  </div>
+
+  <div class="last-updated" id="last-updated"></div>
+</div>
+
+<script>
+let charts = [null, null];
+let activeTab = 0;
+
+function fmtDate(d) {
+  return d.toISOString().slice(0, 10);
+}
+
+function getDate(offsetDays) {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+
+function addQuarter(timeStr) {
+  const [h, m] = timeStr.split(':').map(Number);
+  const total = h * 60 + m + 15;
+  return String(Math.floor(total / 60)).padStart(2,'0') + ':' + String(total % 60).padStart(2,'0');
+}
+
+function getCurrentSlotIndex(data) {
+  const now = new Date();
+  const slotMins = now.getHours() * 60 + Math.floor(now.getMinutes() / 15) * 15;
+  return data.findIndex(d => {
+    const [h, m] = d.time.split(':').map(Number);
+    return h * 60 + m === slotMins;
+  });
+}
+
+async function fetchPrices(date) {
+  const ds = fmtDate(date);
+  // Fetch full day — start of day UTC (22:00 previous day in CET, so we fetch broadly)
+  const from = `${ds}T00:00:00+02:00`;
+  const to   = `${ds}T23:59:59+02:00`;
+  const url = `https://opendata.elia.be/api/explore/v2.1/catalog/datasets/ods004/records`
+    + `?where=datetime%3E%3D%22${encodeURIComponent(from)}%22%20AND%20datetime%3C%3D%22${encodeURIComponent(to)}%22`
+    + `&order_by=datetime&limit=100&timezone=Europe%2FBrussels`;
+
+  const res = await fetch(url);
+  if (!res.ok) throw new Error(`HTTP ${res.status} — ${res.statusText}`);
+  const json = await res.json();
+  return json.results || [];
+}
+
+function parseRecords(records) {
+  const seen = new Set();
+  return records.map(r => {
+    const dt = new Date(r.datetime);
+    // Convert to Brussels local time
+    const local = dt.toLocaleString('en-GB', { timeZone: 'Europe/Brussels', hour: '2-digit', minute: '2-digit', hour12: false });
+    const time = local.replace(',', '').trim().slice(0, 5);
+    const price = r.price !== null && r.price !== undefined ? parseFloat(r.price) : null;
+    return { time, price, dt };
+  })
+  .filter(r => r.price !== null && !seen.has(r.time) && seen.add(r.time))
+  .sort((a, b) => a.dt - b.dt);
+}
+
+function buildStats(idx, data) {
+  const prices = data.map(d => d.price);
+  const avg = prices.reduce((a, b) => a + b, 0) / prices.length;
+  const mn = Math.min(...prices);
+  const mx = Math.max(...prices);
+  const negs = prices.filter(p => p < 0).length;
+
+  document.getElementById('avg' + idx).innerHTML = avg.toFixed(2) + '<span class="stat-unit"> €/MWh</span>';
+  const minClass = mn < 0 ? 'price-neg' : '';
+  document.getElementById('min' + idx).innerHTML = `<span class="${minClass}">${mn.toFixed(2)}</span><span class="stat-unit"> €/MWh</span>`;
+  document.getElementById('max' + idx).innerHTML = mx.toFixed(2) + '<span class="stat-unit"> €/MWh</span>';
+  document.getElementById('neg' + idx).innerHTML = negs + `<span class="stat-unit"> / ${prices.length}</span>`;
+}
+
+function buildChart(idx, data) {
+  const canvas = document.getElementById('chart' + idx);
+  const isDark = matchMedia('(prefers-color-scheme: dark)').matches;
+  const labels = data.map(d => d.time);
+  const prices = data.map(d => d.price);
+
+  const bgColors = prices.map(p => p < 0
+    ? (isDark ? 'rgba(216,90,48,0.35)' : 'rgba(216,90,48,0.20)')
+    : (isDark ? 'rgba(55,138,221,0.35)' : 'rgba(55,138,221,0.18)'));
+  const borderColors = prices.map(p => p < 0 ? '#D85A30' : '#378ADD');
+
+  if (charts[idx]) { charts[idx].destroy(); }
+
+  const gridColor = isDark ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.05)';
+  const tickColor = isDark ? '#888780' : '#888780';
+
+  charts[idx] = new Chart(canvas, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'EUR/MWh',
+        data: prices,
+        backgroundColor: bgColors,
+        borderColor: borderColors,
+        borderWidth: 1,
+        borderRadius: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: ctx => `${ctx[0].label} – ${addQuarter(ctx[0].label)}`,
+            label: ctx => `  ${ctx.parsed.y.toFixed(2)} EUR/MWh`
+          },
+          backgroundColor: isDark ? '#252522' : '#fff',
+          borderColor: isDark ? 'rgba(255,255,255,0.12)' : 'rgba(0,0,0,0.10)',
+          borderWidth: 1,
+          titleColor: isDark ? '#f0efe8' : '#1a1a18',
+          bodyColor: isDark ? '#b4b2a9' : '#5f5e5a',
+          padding: 10,
+          cornerRadius: 6,
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: tickColor, font: { size: 9 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 13 },
+          grid: { display: false },
+          border: { display: false }
+        },
+        y: {
+          ticks: { color: tickColor, font: { size: 10 }, callback: v => v.toFixed(0) },
+          grid: { color: gridColor },
+          border: { display: false }
+        }
+      }
+    }
+  });
+}
+
+function buildTable(idx, data, isToday) {
+  const container = document.getElementById('table' + idx);
+  const maxAbs = Math.max(...data.map(d => Math.abs(d.price)));
+  const currentIdx = isToday ? getCurrentSlotIndex(data) : -1;
+
+  let html = `<div class="table-scroll"><table>
+    <thead><tr>
+      <th>From</th>
+      <th>To</th>
+      <th>Price (EUR/MWh)</th>
+      <th>Visual</th>
+      ${isToday ? '<th>Status</th>' : ''}
+    </tr></thead>
+    <tbody>`;
+
+  data.forEach((d, i) => {
+    const isCurrent = i === currentIdx;
+    const isPast = isToday && i < currentIdx;
+    const rowClass = isCurrent ? 'current-row' : '';
+
+    let priceClass = 'price-pos';
+    if (d.price < 0) priceClass = 'price-neg';
+    else if (d.price > 100) priceClass = 'price-high';
+
+    const barW = Math.round((Math.abs(d.price) / maxAbs) * 86);
+    const barColor = d.price < 0 ? '#D85A30' : '#378ADD';
+
+    let statusCell = '';
+    if (isToday) {
+      if (isCurrent) statusCell = `<td><span class="status-pill pill-now">Now</span></td>`;
+      else if (isPast) statusCell = `<td><span class="status-pill pill-past">Past</span></td>`;
+      else statusCell = `<td><span class="status-pill pill-soon">Upcoming</span></td>`;
+    }
+
+    html += `<tr class="${rowClass}">
+      <td>${d.time}</td>
+      <td style="color:var(--text3)">${addQuarter(d.time)}</td>
+      <td class="${priceClass}">${d.price.toFixed(2)}</td>
+      <td class="mini-bar-wrap"><div class="mini-bar" style="width:${barW}px;background:${barColor}"></div></td>
+      ${statusCell}
+    </tr>`;
+  });
+
+  html += '</tbody></table></div>';
+  container.innerHTML = html;
+
+  if (isCurrent >= 0) {
+    setTimeout(() => {
+      const rows = container.querySelectorAll('tbody tr');
+      if (rows[currentIdx]) rows[currentIdx].scrollIntoView({ block: 'nearest' });
+    }, 100);
+  }
+}
+
+async function loadDay(idx, date, isToday) {
+  const stateEl = document.getElementById('state' + idx);
+  const tableEl = document.getElementById('table' + idx);
+
+  tableEl.innerHTML = `<div class="state-msg"><div class="spinner"></div><span>Loading prices from Elia…</span></div>`;
+
+  try {
+    const records = await fetchPrices(date);
+    const data = parseRecords(records);
+
+    if (data.length === 0) {
+      tableEl.innerHTML = `<div class="state-msg"><span>${idx === 1
+        ? "Tomorrow's prices aren't published yet — they usually appear after 13:00 CET."
+        : "No price data found for today."}</span></div>`;
+      return false;
+    }
+
+    buildStats(idx, data);
+    buildChart(idx, data);
+    buildTable(idx, data, isToday);
+    return true;
+
+  } catch (e) {
+    tableEl.innerHTML = `<div class="state-msg"><span>Error loading prices: ${e.message}</span></div>`;
+    return false;
+  }
+}
+
+function switchTab(idx) {
+  activeTab = idx;
+  document.querySelectorAll('.tab-btn').forEach((b, i) => b.classList.toggle('active', i === idx));
+  document.querySelectorAll('.panel').forEach((p, i) => p.classList.toggle('active', i === idx));
+}
+
+async function init() {
+  const todayDate = getDate(0);
+  const tomorrowDate = getDate(1);
+
+  const tab0 = document.getElementById('tab0');
+  const tab1 = document.getElementById('tab1');
+
+  tab0.textContent = todayDate.toLocaleDateString('en-BE', { weekday: 'short', month: 'short', day: 'numeric' }) + ' (today)';
+  tab1.textContent = tomorrowDate.toLocaleDateString('en-BE', { weekday: 'short', month: 'short', day: 'numeric' }) + ' (tomorrow)';
+  tab1.disabled = true;
+
+  await loadDay(0, todayDate, true);
+
+  const tmrOk = await loadDay(1, tomorrowDate, false);
+  if (tmrOk) {
+    tab1.disabled = false;
+    tab1.innerHTML = tomorrowDate.toLocaleDateString('en-BE', { weekday: 'short', month: 'short', day: 'numeric' })
+      + ' (tomorrow) <span class="badge">Available</span>';
+  }
+
+  document.getElementById('last-updated').textContent =
+    'Last fetched: ' + new Date().toLocaleString('en-BE', { timeZone: 'Europe/Brussels' });
+}
+
+init();
+</script>
+</body>
+</html>
